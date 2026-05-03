@@ -1,9 +1,20 @@
-import { pgTable, text, serial, integer, boolean } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, boolean, timestamp } from "drizzle-orm/pg-core";
+
+export const restaurantsTable = pgTable("restaurants", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  subdomain: text("subdomain").notNull().unique(),
+  address: text("address"),
+  logoUrl: text("logo_url"),
+  password: text("password").notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
 
 export const menuSectionsTable = pgTable("menu_sections", {
   id: serial("id").primaryKey(),
+  restaurantId: integer("restaurant_id").references(() => restaurantsTable.id, { onDelete: "cascade" }),
   title: text("title").notNull(),
-  slug: text("slug").notNull().unique(),
+  slug: text("slug").notNull(),
   sortOrder: integer("sort_order").notNull().default(0),
 });
 
@@ -32,6 +43,7 @@ export const menuItemsTable = pgTable("menu_items", {
   sortOrder: integer("sort_order").notNull().default(0),
 });
 
+export type Restaurant = typeof restaurantsTable.$inferSelect;
 export type MenuSection = typeof menuSectionsTable.$inferSelect;
 export type MenuCategory = typeof menuCategoriesTable.$inferSelect;
 export type MenuItem = typeof menuItemsTable.$inferSelect;

@@ -1,8 +1,14 @@
 import { NextRequest } from "next/server";
 
+export function getRestaurantId(req: NextRequest): number | null {
+  const cookie = req.cookies.get("menu_admin");
+  if (!cookie?.value) return null;
+  const id = parseInt(cookie.value, 10);
+  return isNaN(id) ? null : id;
+}
+
 export function isAuthorized(req: NextRequest): boolean {
-  const cookie = req.cookies.get("karement_admin");
-  return cookie?.value === "1";
+  return getRestaurantId(req) !== null;
 }
 
 export function unauthorizedResponse() {

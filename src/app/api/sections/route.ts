@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db, menuSectionsTable } from "@/lib/db";
-import { asc } from "drizzle-orm";
-import { isAuthorized, unauthorizedResponse } from "@/lib/auth";
+import { asc, eq } from "drizzle-orm";
+import { getRestaurantId, isAuthorized, unauthorizedResponse } from "@/lib/auth";
 import { z } from "zod";
 
 const CreateSectionBody = z.object({
@@ -10,16 +10,22 @@ const CreateSectionBody = z.object({
   sortOrder: z.number().optional(),
 });
 
-export async function GET() {
+export async function GET(req: NextRequest) {
+  if (!isAuthorized(req)) return unauthorizedResponse();
+
+  const restaurantId = getRestaurantId(req)!;
   const sections = await db
     .select()
     .from(menuSectionsTable)
+    .where(eq(menuSectionsTable.restaurantId, restaurantId))
     .orderBy(asc(menuSectionsTable.sortOrder));
+
   return NextResponse.json(sections);
 }
 
 export async function POST(req: NextRequest) {
-  if (!isAuthorized(req)) return unauthorizedResponse();
+  const restaurantId = getRestaurantId(req);
+  if (!restaurantId) return unauthorizedResponse();
 
   const body = await req.json();
   const parsed = CreateSectionBody.safeParse(body);
@@ -29,7 +35,7 @@ export async function POST(req: NextRequest) {
 
   const [section] = await db
     .insert(menuSectionsTable)
-    .values({ ...parsed.data, sortOrder: parsed.data.sortOrder ?? 0 })
+    .values({ ...parsed.data, restaurantId, sortOrder: parsed.data.sortOrder ?? 0 })
     .returning();
 
   return NextResponse.json(section, { status: 201 });

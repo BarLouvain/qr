@@ -20,8 +20,24 @@ export function MenuApp() {
 function MenuContent() {
   const [activeSlug, setActiveSlug] = useState<string | null>(null);
   const [showScrollHint, setShowScrollHint] = useState(true);
+  const [dark, setDark] = useState(false);
   const navScrollRef = useRef<HTMLDivElement>(null);
   const menu = useGetFullMenu();
+
+  // Load dark mode preference from localStorage
+  useEffect(() => {
+    try {
+      setDark(localStorage.getItem("menu-dark") === "1");
+    } catch {}
+  }, []);
+
+  function toggleDark() {
+    const next = !dark;
+    setDark(next);
+    try {
+      localStorage.setItem("menu-dark", next ? "1" : "0");
+    } catch {}
+  }
 
   useEffect(() => {
     const el = navScrollRef.current;
@@ -41,9 +57,12 @@ function MenuContent() {
   const currentSection = sections.find((s) => s.slug === currentSlug) ?? sections[0] ?? null;
 
   return (
-    <div className="menu-theme" style={{ fontFamily: "'DM Sans', sans-serif", background: "var(--bg)", minHeight: "100vh" }}>
+    <div
+      className={dark ? "menu-theme dark" : "menu-theme"}
+      style={{ fontFamily: "'DM Sans', sans-serif", background: "var(--bg)", minHeight: "100vh" }}
+    >
       {/* Header */}
-      <header style={{ padding: "48px 32px 36px", borderBottom: "1px solid var(--border)", background: "var(--bg)", textAlign: "center" }}>
+      <header style={{ padding: "48px 32px 36px", borderBottom: "1px solid var(--border)", background: "var(--bg)", textAlign: "center", position: "relative" }}>
         <div style={{ maxWidth: "960px", margin: "0 auto" }}>
           <img
             src="/logo.png"
@@ -54,6 +73,31 @@ function MenuContent() {
             Oudemarkt 43 — Leuven
           </p>
         </div>
+
+        {/* Dark mode toggle */}
+        <button
+          onClick={toggleDark}
+          aria-label={dark ? "Schakel naar lichte modus" : "Schakel naar donkere modus"}
+          style={{
+            position: "absolute",
+            top: "20px",
+            right: "20px",
+            background: "var(--surface)",
+            border: "1px solid var(--border)",
+            borderRadius: "50%",
+            width: "36px",
+            height: "36px",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            cursor: "pointer",
+            fontSize: "16px",
+            transition: "background 0.2s, border-color 0.2s",
+            color: "var(--text-muted)",
+          }}
+        >
+          {dark ? "☀️" : "🌙"}
+        </button>
       </header>
 
       {/* Nav */}
@@ -107,7 +151,7 @@ function MenuContent() {
         {menu.isLoading && (
           <div style={{ display: "flex", flexDirection: "column", gap: "16px", paddingTop: "20px" }}>
             {[...Array(6)].map((_, i) => (
-              <div key={i} style={{ height: "24px", borderRadius: "4px", background: "#f0f0f0", width: i % 2 === 0 ? "70%" : "40%", animation: "pulse 1.5s ease-in-out infinite" }} />
+              <div key={i} style={{ height: "24px", borderRadius: "4px", background: "var(--surface)", width: i % 2 === 0 ? "70%" : "40%", animation: "pulse 1.5s ease-in-out infinite" }} />
             ))}
           </div>
         )}

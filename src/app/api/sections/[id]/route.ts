@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db, menuSectionsTable } from "@/lib/db";
-import { eq } from "drizzle-orm";
-import { isAuthorized, unauthorizedResponse } from "@/lib/auth";
+import { and, eq } from "drizzle-orm";
+import { getRestaurantId, isAuthorized, unauthorizedResponse } from "@/lib/auth";
 import { z } from "zod";
 
 const UpdateSectionBody = z.object({
@@ -26,7 +26,8 @@ export async function GET(_req: NextRequest, { params }: Params) {
 }
 
 export async function PATCH(req: NextRequest, { params }: Params) {
-  if (!isAuthorized(req)) return unauthorizedResponse();
+  const restaurantId = getRestaurantId(req);
+  if (!restaurantId) return unauthorizedResponse();
 
   const { id } = await params;
   const body = await req.json();
@@ -38,7 +39,12 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   const [section] = await db
     .update(menuSectionsTable)
     .set(parsed.data)
-    .where(eq(menuSectionsTable.id, Number(id)))
+    .where(
+      and(
+        eq(menuSectionsTable.id, Number(id)),
+        eq(menuSectionsTable.restaurantId, restaurantId)
+      )
+    )
     .returning();
 
   if (!section) {
@@ -48,12 +54,18 @@ export async function PATCH(req: NextRequest, { params }: Params) {
 }
 
 export async function DELETE(req: NextRequest, { params }: Params) {
-  if (!isAuthorized(req)) return unauthorizedResponse();
+  const restaurantId = getRestaurantId(req);
+  if (!restaurantId) return unauthorizedResponse();
 
   const { id } = await params;
   const [section] = await db
     .delete(menuSectionsTable)
-    .where(eq(menuSectionsTable.id, Number(id)))
+    .where(
+      and(
+        eq(menuSectionsTable.id, Number(id)),
+        eq(menuSectionsTable.restaurantId, restaurantId)
+      )
+    )
     .returning();
 
   if (!section) {

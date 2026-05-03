@@ -1,18 +1,22 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getRestaurantFromSubdomain } from "@/lib/restaurant";
 
 export async function POST(req: NextRequest) {
   const { password } = await req.json();
 
-  if (!process.env.ADMIN_PASSWORD) {
-    return NextResponse.json({ error: "Server misconfigured" }, { status: 500 });
+  const subdomain = req.headers.get("x-subdomain");
+  const restaurant = await getRestaurantFromSubdomain(subdomain);
+
+  if (!restaurant) {
+    return NextResponse.json({ error: "Restaurant niet gevonden" }, { status: 404 });
   }
 
-  if (password !== process.env.ADMIN_PASSWORD) {
+  if (password !== restaurant.password) {
     return NextResponse.json({ error: "Onjuist wachtwoord" }, { status: 401 });
   }
 
   const res = NextResponse.json({ ok: true });
-  res.cookies.set("karement_admin", "1", {
+  res.cookies.set("menu_admin", String(restaurant.id), {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
     sameSite: "lax",
@@ -24,6 +28,6 @@ export async function POST(req: NextRequest) {
 
 export async function DELETE() {
   const res = NextResponse.json({ ok: true });
-  res.cookies.delete("karement_admin");
+  res.cookies.delete("menu_admin");
   return res;
 }

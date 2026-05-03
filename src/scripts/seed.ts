@@ -2,7 +2,13 @@ import dotenv from "dotenv";
 dotenv.config({ path: ".env.local" });
 import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
-import { menuSectionsTable, menuCategoriesTable, menuItemsTable } from "../lib/db/schema";
+import { and, eq, isNull } from "drizzle-orm";
+import {
+  restaurantsTable,
+  menuSectionsTable,
+  menuCategoriesTable,
+  menuItemsTable,
+} from "../lib/db/schema";
 
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 const db = drizzle(pool);
@@ -299,13 +305,7 @@ const menuData = [
           { name: "The Devron 12Y", price: "11", sortOrder: 11 },
         ],
       },
-      {
-        label: "Vodka", sortOrder: 1,
-        items: [
-          { name: "Eristoff Brut / Red / Pink", price: "6.5", sortOrder: 0 },
-          { name: "Grey Goose", price: "11", sortOrder: 1 },
-        ],
-      },
+      { label: "Vodka", sortOrder: 1, items: [{ name: "Eristoff Brut / Red / Pink", price: "6.5", sortOrder: 0 }, { name: "Grey Goose", price: "11", sortOrder: 1 }] },
       {
         label: "Rum", sortOrder: 2,
         items: [
@@ -319,28 +319,9 @@ const menuData = [
           { name: "Diplomatico Reserva Exclusiva", price: "11", sortOrder: 7 },
         ],
       },
-      {
-        label: "Tequila", sortOrder: 3,
-        items: [
-          { name: "Tequila Pistoleros", price: "6", sortOrder: 0 },
-          { name: "Patron Silver / Reposado", price: "12 | 15", sortOrder: 1 },
-        ],
-      },
-      {
-        label: "Cognac", sortOrder: 4,
-        items: [
-          { name: "Hennessy VS", price: "11", sortOrder: 0 },
-          { name: "Hennessy XO", price: "28", sortOrder: 1 },
-        ],
-      },
-      {
-        label: "Others", sortOrder: 5,
-        items: [
-          { name: "Jägermeister", price: "7", sortOrder: 0 },
-          { name: "Jenever Appel", price: "6.5", sortOrder: 1 },
-          { name: "Triple Sec", price: "7", sortOrder: 2 },
-        ],
-      },
+      { label: "Tequila", sortOrder: 3, items: [{ name: "Tequila Pistoleros", price: "6", sortOrder: 0 }, { name: "Patron Silver / Reposado", price: "12 | 15", sortOrder: 1 }] },
+      { label: "Cognac", sortOrder: 4, items: [{ name: "Hennessy VS", price: "11", sortOrder: 0 }, { name: "Hennessy XO", price: "28", sortOrder: 1 }] },
+      { label: "Others", sortOrder: 5, items: [{ name: "Jägermeister", price: "7", sortOrder: 0 }, { name: "Jenever Appel", price: "6.5", sortOrder: 1 }, { name: "Triple Sec", price: "7", sortOrder: 2 }] },
       {
         label: "Shots", sortOrder: 6,
         items: [
@@ -428,21 +409,59 @@ const menuData = [
 ];
 
 async function seed() {
-  console.log("Seeding menu data...");
+  console.log("Seeding...");
 
+  // 1. Create/update the karément restaurant record
+  const [restaurant] = await db
+    .insert(restaurantsTable)
+    .values({
+      name: "karément",
+      subdomain: "karement",
+      address: "Oudemarkt 43, Leuven",
+      password: process.env.ADMIN_PASSWORD ?? "changeme",
+    })
+    .onConflictDoUpdate({
+      target: restaurantsTable.subdomain,
+      set: { name: "karément", address: "Oudemarkt 43, Leuven" },
+    })
+    .returning();
+
+  console.log(`Restaurant: ${restaurant.name} (id=${restaurant.id})`);
+
+  // 2. Migrate any existing sections that have no restaurantId
+  const migrated = await db
+    .update(menuSectionsTable)
+    .set({ restaurantId: restaurant.id })
+    .where(isNull(menuSectionsTable.restaurantId))
+    .returning();
+
+  if (migrated.length > 0) {
+    console.log(`Migrated ${migrated.length} existing sections to restaurant ${restaurant.id}`);
+  }
+
+  // 3. Seed menu data (skips sections that already exist for this restaurant)
   for (const sectionData of menuData) {
     const { categories, ...sectionFields } = sectionData;
 
-    const [section] = await db
-      .insert(menuSectionsTable)
-      .values(sectionFields)
-      .onConflictDoNothing()
-      .returning();
+    const [existing] = await db
+      .select()
+      .from(menuSectionsTable)
+      .where(
+        and(
+          eq(menuSectionsTable.slug, sectionFields.slug),
+          eq(menuSectionsTable.restaurantId, restaurant.id)
+        )
+      );
 
-    if (!section) {
+    if (existing) {
       console.log(`Section "${sectionFields.title}" already exists, skipping.`);
       continue;
     }
+
+    const [section] = await db
+      .insert(menuSectionsTable)
+      .values({ ...sectionFields, restaurantId: restaurant.id })
+      .returning();
 
     for (const categoryData of categories) {
       const { items, ...categoryFields } = categoryData as any;
