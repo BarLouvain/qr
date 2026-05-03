@@ -285,7 +285,7 @@ async function seed() {
     })
     .onConflictDoUpdate({
       target: restaurantsTable.subdomain,
-      set: { name: "Bar Louvain" },
+      set: { name: "Bar Louvain", logoUrl: "/logo-barlouvain.png" },
     })
     .returning();
 
