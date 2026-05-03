@@ -1,3 +1,15 @@
+export type MenuTag = {
+  id: number;
+  restaurantId: number;
+  value: string;
+  label: string;
+  icon: string;
+  bgColor: string;
+  textColor: string;
+  borderColor: string;
+  sortOrder: number;
+};
+
 export type MenuSection = {
   id: number;
   title: string;

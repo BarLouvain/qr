@@ -12,6 +12,7 @@ import type {
   MenuSection,
   MenuCategory,
   MenuItem,
+  MenuTag,
   CreateSectionBody,
   UpdateSectionBody,
   CreateCategoryBody,
@@ -24,6 +25,7 @@ import type {
 
 export const fullMenuKey = () => ["/api/menu"] as const;
 export const sectionsKey = () => ["/api/sections"] as const;
+export const tagsKey = () => ["/api/tags"] as const;
 
 // ─── Full menu ────────────────────────────────────────────────────────────────
 
@@ -34,6 +36,42 @@ export function useGetFullMenu(
     queryKey: fullMenuKey(),
     queryFn: () => apiFetch<SectionWithNested[]>("/api/menu"),
     ...options,
+  });
+}
+
+// ─── Tags ─────────────────────────────────────────────────────────────────────
+
+export function useListTags() {
+  return useQuery<MenuTag[]>({
+    queryKey: tagsKey(),
+    queryFn: () => apiFetch<MenuTag[]>("/api/tags"),
+  });
+}
+
+export function useCreateTag() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data: Omit<MenuTag, "id" | "restaurantId">) =>
+      apiFetch<MenuTag>("/api/tags", { method: "POST", body: JSON.stringify(data) }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: tagsKey() }),
+  });
+}
+
+export function useUpdateTag() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, data }: { id: number; data: Partial<Omit<MenuTag, "id" | "restaurantId">> }) =>
+      apiFetch<MenuTag>(`/api/tags/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: tagsKey() }),
+  });
+}
+
+export function useDeleteTag() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id }: { id: number }) =>
+      apiFetch<void>(`/api/tags/${id}`, { method: "DELETE" }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: tagsKey() }),
   });
 }
 

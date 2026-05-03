@@ -5,10 +5,19 @@ import { Pool } from "pg";
 import { and, eq, isNull } from "drizzle-orm";
 import {
   restaurantsTable,
+  menuTagsTable,
   menuSectionsTable,
   menuCategoriesTable,
   menuItemsTable,
 } from "../lib/db/schema";
+
+const DEFAULT_TAGS = [
+  { value: "bestseller", label: "Bestseller", icon: "⭐", bgColor: "#fff4e0", textColor: "#9a6a00", borderColor: "#ffe0a0", sortOrder: 0 },
+  { value: "popular", label: "Berucht", icon: "🔥", bgColor: "#fef0ee", textColor: "#c93a20", borderColor: "#fac8be", sortOrder: 1 },
+  { value: "alcoholvrij", label: "Alcoholvrij", icon: "🥤", bgColor: "#eef6ee", textColor: "#2e7a2e", borderColor: "#b8ddb8", sortOrder: 2 },
+  { value: "vegetarisch", label: "Vegetarisch", icon: "🌿", bgColor: "#eef6ee", textColor: "#2e7a2e", borderColor: "#b8ddb8", sortOrder: 3 },
+  { value: "glutenvrij", label: "Glutenvrij", icon: "🌾", bgColor: "#fdf6e3", textColor: "#8a6200", borderColor: "#f0d98a", sortOrder: 4 },
+];
 
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 const db = drizzle(pool);
@@ -428,7 +437,19 @@ async function seed() {
 
   console.log(`Restaurant: ${restaurant.name} (id=${restaurant.id})`);
 
-  // 2. Migrate any existing sections that have no restaurantId
+  // 2. Seed default tags (skip if already exist)
+  for (const tag of DEFAULT_TAGS) {
+    const [existing] = await db
+      .select()
+      .from(menuTagsTable)
+      .where(and(eq(menuTagsTable.restaurantId, restaurant.id), eq(menuTagsTable.value, tag.value)));
+    if (!existing) {
+      await db.insert(menuTagsTable).values({ ...tag, restaurantId: restaurant.id });
+      console.log(`  Tag "${tag.label}" aangemaakt`);
+    }
+  }
+
+  // 3. Migrate any existing sections that have no restaurantId
   const migrated = await db
     .update(menuSectionsTable)
     .set({ restaurantId: restaurant.id })
@@ -439,7 +460,7 @@ async function seed() {
     console.log(`Migrated ${migrated.length} existing sections to restaurant ${restaurant.id}`);
   }
 
-  // 3. Seed menu data (skips sections that already exist for this restaurant)
+  // 4. Seed menu data (skips sections that already exist for this restaurant)
   for (const sectionData of menuData) {
     const { categories, ...sectionFields } = sectionData;
 

@@ -4,21 +4,14 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { X } from "lucide-react";
-import { useCreateItem, useUpdateItem } from "@/lib/api/hooks";
+import { useCreateItem, useUpdateItem, useListTags } from "@/lib/api/hooks";
 import { useToast } from "@/hooks/use-toast";
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Badge } from "@/components/ui/badge";
 import type { MenuItem } from "@/lib/api/types";
-
-const AVAILABLE_TAGS = [
-  { value: "bestseller", label: "Bestseller" },
-  { value: "popular", label: "Popular" },
-  { value: "alcoholvrij", label: "Alcoholvrij" },
-];
 
 const schema = z.object({
   name: z.string().min(1, "Name is required"),
@@ -42,6 +35,7 @@ interface Props {
 export function ItemForm({ categoryId, initialData, onSuccess, onCancel }: Props) {
   const createItem = useCreateItem();
   const updateItem = useUpdateItem();
+  const { data: availableTags = [] } = useListTags();
   const { toast } = useToast();
 
   const form = useForm<FormData>({
@@ -117,27 +111,28 @@ export function ItemForm({ categoryId, initialData, onSuccess, onCancel }: Props
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2 border-t border-border">
           <div className="space-y-4">
             <h4 className="text-sm font-medium">Tags</h4>
-            <div className="flex flex-wrap gap-2">
-              {AVAILABLE_TAGS.map(({ value, label }) => {
-                const active = tags.includes(value);
-                return (
-                  <button
-                    key={value}
-                    type="button"
-                    onClick={() => toggleTag(value)}
-                    className={`text-xs px-3 py-1.5 rounded border font-medium transition-colors ${
-                      active ? "bg-primary text-primary-foreground border-primary" : "bg-transparent text-muted-foreground border-border hover:border-primary/50 hover:text-foreground"
-                    }`}
-                  >
-                    {active && <X className="h-3 w-3 inline mr-1 -mt-0.5" />}
-                    {label}
-                  </button>
-                );
-              })}
-            </div>
-            {tags.length > 0 && (
-              <div className="flex flex-wrap gap-1">
-                {tags.map((tag) => <Badge key={tag} variant="secondary" className="text-xs">{tag}</Badge>)}
+            {availableTags.length === 0 ? (
+              <p className="text-xs text-muted-foreground">Nog geen tags. Maak ze aan via <strong>Tags</strong> in het menu.</p>
+            ) : (
+              <div className="flex flex-wrap gap-2">
+                {availableTags.map((tag) => {
+                  const active = tags.includes(tag.value);
+                  return (
+                    <button
+                      key={tag.value}
+                      type="button"
+                      onClick={() => toggleTag(tag.value)}
+                      className={`text-xs px-3 py-1.5 rounded border font-semibold transition-all ${active ? "ring-2 ring-primary ring-offset-1" : "opacity-60 hover:opacity-100"}`}
+                      style={active
+                        ? { background: tag.bgColor, color: tag.textColor, borderColor: tag.borderColor }
+                        : { background: "transparent", color: "var(--muted-foreground)", borderColor: "var(--border)" }
+                      }
+                    >
+                      {active && <X className="h-3 w-3 inline mr-1 -mt-0.5" />}
+                      {tag.icon} {tag.label}
+                    </button>
+                  );
+                })}
               </div>
             )}
 

@@ -18,6 +18,20 @@ export const menuSectionsTable = pgTable("menu_sections", {
   sortOrder: integer("sort_order").notNull().default(0),
 });
 
+export const menuTagsTable = pgTable("menu_tags", {
+  id: serial("id").primaryKey(),
+  restaurantId: integer("restaurant_id")
+    .notNull()
+    .references(() => restaurantsTable.id, { onDelete: "cascade" }),
+  value: text("value").notNull(),
+  label: text("label").notNull(),
+  icon: text("icon").notNull().default(""),
+  bgColor: text("bg_color").notNull().default("#f0f0f0"),
+  textColor: text("text_color").notNull().default("#555555"),
+  borderColor: text("border_color").notNull().default("#dddddd"),
+  sortOrder: integer("sort_order").notNull().default(0),
+});
+
 export const menuCategoriesTable = pgTable("menu_categories", {
   id: serial("id").primaryKey(),
   sectionId: integer("section_id")
@@ -44,6 +58,7 @@ export const menuItemsTable = pgTable("menu_items", {
 });
 
 export type Restaurant = typeof restaurantsTable.$inferSelect;
+export type MenuTag = typeof menuTagsTable.$inferSelect;
 export type MenuSection = typeof menuSectionsTable.$inferSelect;
 export type MenuCategory = typeof menuCategoriesTable.$inferSelect;
 export type MenuItem = typeof menuItemsTable.$inferSelect;

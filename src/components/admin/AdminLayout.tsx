@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Coffee, LayoutDashboard, ListTree, LogOut } from "lucide-react";
+import { Coffee, LayoutDashboard, ListTree, LogOut, Tag } from "lucide-react";
 
 interface AdminLayoutProps {
   children: React.ReactNode;
@@ -45,6 +45,17 @@ export function AdminLayout({ children, onLogout }: AdminLayoutProps) {
           >
             <ListTree size={18} />
             Manage Sections
+          </Link>
+          <Link
+            href="/admin/tags"
+            className={`flex items-center gap-3 px-3 py-2.5 rounded-md transition-colors ${
+              pathname === "/admin/tags"
+                ? "bg-primary/10 text-primary font-medium"
+                : "text-muted-foreground hover:bg-muted hover:text-foreground"
+            }`}
+          >
+            <Tag size={18} />
+            Tags
           </Link>
         </nav>
 
