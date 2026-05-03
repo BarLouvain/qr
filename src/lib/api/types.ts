@@ -1,3 +1,15 @@
+export type RestaurantInfo = {
+  id: number;
+  name: string;
+  subdomain: string;
+  address: string | null;
+  logoUrl: string | null;
+  tagline: string | null;
+  instagramUrl: string | null;
+  facebookUrl: string | null;
+  googleReviewUrl: string | null;
+};
+
 export type MenuTag = {
   id: number;
   restaurantId: number;

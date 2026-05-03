@@ -427,11 +427,22 @@ async function seed() {
       name: "karément",
       subdomain: "karement",
       address: "Oudemarkt 43, Leuven",
+      tagline: "cocktails. Tapas. Nightlife.",
+      instagramUrl: "https://www.instagram.com/karementleuven",
+      facebookUrl: "https://www.facebook.com/p/Kar%C3%A9ment-100063445128456/",
+      googleReviewUrl: "https://www.google.com/search?q=Karement+Reviews+Leuven&si=AL3DRZEsmMGCryMMFSHJ3StBhOdZ2-6yYkXd_doETEE1OR-qOdS5HqyYOP3THZtbnO7UtDQFnGp8uoEU6P7xaGmmAdDNH6J6RRNAKNlml27q1OnZL6X04nEGwwb4PnlF7DOjzjYUGWAh",
       password: process.env.ADMIN_PASSWORD ?? "changeme",
     })
     .onConflictDoUpdate({
       target: restaurantsTable.subdomain,
-      set: { name: "karément", address: "Oudemarkt 43, Leuven" },
+      set: {
+        name: "karément",
+        address: "Oudemarkt 43, Leuven",
+        tagline: "cocktails. Tapas. Nightlife.",
+        instagramUrl: "https://www.instagram.com/karementleuven",
+        facebookUrl: "https://www.facebook.com/p/Kar%C3%A9ment-100063445128456/",
+        googleReviewUrl: "https://www.google.com/search?q=Karement+Reviews+Leuven&si=AL3DRZEsmMGCryMMFSHJ3StBhOdZ2-6yYkXd_doETEE1OR-qOdS5HqyYOP3THZtbnO7UtDQFnGp8uoEU6P7xaGmmAdDNH6J6RRNAKNlml27q1OnZL6X04nEGwwb4PnlF7DOjzjYUGWAh",
+      },
     })
     .returning();
 

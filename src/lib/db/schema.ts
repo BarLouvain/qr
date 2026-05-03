@@ -6,6 +6,10 @@ export const restaurantsTable = pgTable("restaurants", {
   subdomain: text("subdomain").notNull().unique(),
   address: text("address"),
   logoUrl: text("logo_url"),
+  tagline: text("tagline"),
+  instagramUrl: text("instagram_url"),
+  facebookUrl: text("facebook_url"),
+  googleReviewUrl: text("google_review_url"),
   password: text("password").notNull(),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });

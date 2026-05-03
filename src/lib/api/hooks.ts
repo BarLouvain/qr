@@ -13,6 +13,7 @@ import type {
   MenuCategory,
   MenuItem,
   MenuTag,
+  RestaurantInfo,
   CreateSectionBody,
   UpdateSectionBody,
   CreateCategoryBody,
@@ -23,9 +24,19 @@ import type {
 
 // ─── Query keys ──────────────────────────────────────────────────────────────
 
+export const restaurantKey = () => ["/api/restaurant"] as const;
 export const fullMenuKey = () => ["/api/menu"] as const;
 export const sectionsKey = () => ["/api/sections"] as const;
 export const tagsKey = () => ["/api/tags"] as const;
+
+// ─── Restaurant ───────────────────────────────────────────────────────────────
+
+export function useGetRestaurant() {
+  return useQuery<RestaurantInfo | null>({
+    queryKey: restaurantKey(),
+    queryFn: () => apiFetch<RestaurantInfo>("/api/restaurant").catch(() => null),
+  });
+}
 
 // ─── Full menu ────────────────────────────────────────────────────────────────
 
