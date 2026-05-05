@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Coffee, LayoutDashboard, ListTree, LogOut, Tag } from "lucide-react";
+import { Coffee, ShoppingBasket, ListTree, LogOut, Tag } from "lucide-react";
 
 interface AdminLayoutProps {
   children: React.ReactNode;
@@ -32,8 +32,8 @@ export function AdminLayout({ children, onLogout }: AdminLayoutProps) {
                 : "text-muted-foreground hover:bg-muted hover:text-foreground"
             }`}
           >
-            <LayoutDashboard size={18} />
-            Menu Dashboard
+            <ShoppingBasket size={18} />
+            Manage Products
           </Link>
           <Link
             href="/admin/sections"

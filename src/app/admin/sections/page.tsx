@@ -1,8 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Plus, GripVertical, Edit2, Trash2, Save, X } from "lucide-react";
-import { useListSections, useCreateSection, useUpdateSection, useDeleteSection } from "@/lib/api/hooks";
+import { useQueryClient } from "@tanstack/react-query";
+import { useListSections, useCreateSection, useUpdateSection, useDeleteSection, sectionsKey, fullMenuKey } from "@/lib/api/hooks";
+import { apiFetch } from "@/lib/api/client";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,6 +14,7 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import type { MenuSection } from "@/lib/api/types";
 
 export default function SectionsPage() {
   const { data: sections, isLoading } = useListSections();
@@ -20,10 +23,19 @@ export default function SectionsPage() {
   const deleteSection = useDeleteSection();
   const { toast } = useToast();
 
+  const qc = useQueryClient();
   const [isCreating, setIsCreating] = useState(false);
   const [newSection, setNewSection] = useState({ title: "", slug: "" });
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editData, setEditData] = useState({ title: "", slug: "" });
+
+  const [ordered, setOrdered] = useState<MenuSection[]>([]);
+  const [dragIndex, setDragIndex] = useState<number | null>(null);
+  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (sections) setOrdered(sections);
+  }, [sections]);
 
   const handleCreate = () => {
     if (!newSection.title || !newSection.slug) {
@@ -31,7 +43,7 @@ export default function SectionsPage() {
       return;
     }
     createSection.mutate(
-      { data: { ...newSection, sortOrder: sections ? sections.length : 0 } },
+      { data: { ...newSection, sortOrder: ordered.length } },
       {
         onSuccess: () => { setIsCreating(false); setNewSection({ title: "", slug: "" }); toast({ title: "Section created successfully" }); },
         onError: () => toast({ title: "Error creating section", variant: "destructive" }),
@@ -60,9 +72,55 @@ export default function SectionsPage() {
     );
   };
 
-  const startEdit = (section: { id: number; title: string; slug: string }) => {
+  const startEdit = (section: MenuSection) => {
     setEditingId(section.id);
     setEditData({ title: section.title, slug: section.slug });
+  };
+
+  const handleDragStart = (index: number) => {
+    setDragIndex(index);
+  };
+
+  const handleDragOver = (e: React.DragEvent, index: number) => {
+    e.preventDefault();
+    setDragOverIndex(index);
+  };
+
+  const handleDrop = async (targetIndex: number) => {
+    if (dragIndex === null || dragIndex === targetIndex) {
+      setDragIndex(null);
+      setDragOverIndex(null);
+      return;
+    }
+
+    const reordered = [...ordered];
+    const [moved] = reordered.splice(dragIndex, 1);
+    reordered.splice(targetIndex, 0, moved);
+
+    // Determine which sections need a new sortOrder before mutating state
+    const updates = reordered
+      .map((section, i) => ({ section, newOrder: i }))
+      .filter(({ section, newOrder }) => section.sortOrder !== newOrder);
+
+    // Optimistically update local state AND query cache so useEffect gets the correct order
+    const withNewSortOrders = reordered.map((s, i) => ({ ...s, sortOrder: i }));
+    setOrdered(withNewSortOrders);
+    qc.setQueryData(sectionsKey(), withNewSortOrders);
+    setDragIndex(null);
+    setDragOverIndex(null);
+
+    await Promise.all(
+      updates.map(({ section, newOrder }) =>
+        apiFetch(`/api/sections/${section.id}`, { method: "PATCH", body: JSON.stringify({ sortOrder: newOrder }) })
+      )
+    );
+    qc.invalidateQueries({ queryKey: sectionsKey() });
+    qc.invalidateQueries({ queryKey: fullMenuKey() });
+  };
+
+  const handleDragEnd = () => {
+    setDragIndex(null);
+    setDragOverIndex(null);
   };
 
   return (
@@ -113,15 +171,26 @@ export default function SectionsPage() {
 
         {isLoading ? (
           Array(3).fill(0).map((_, i) => <Skeleton key={i} className="h-16 w-full" />)
-        ) : sections?.length === 0 && !isCreating ? (
+        ) : ordered.length === 0 && !isCreating ? (
           <div className="text-center py-12 text-muted-foreground border border-dashed rounded-lg">
             No sections yet. Click &quot;Add Section&quot; to get started.
           </div>
         ) : (
-          sections?.map((section) => (
-            <Card key={section.id} className="group">
+          ordered.map((section, index) => (
+            <div key={section.id}>
+              {dragIndex !== null && dragOverIndex === index && dragIndex > index && (
+                <div className="h-0.5 bg-primary rounded-full mb-3" />
+              )}
+            <Card
+              className={`group transition-opacity ${dragIndex === index ? "opacity-40" : ""}`}
+              draggable
+              onDragStart={() => handleDragStart(index)}
+              onDragOver={(e) => handleDragOver(e, index)}
+              onDrop={() => handleDrop(index)}
+              onDragEnd={handleDragEnd}
+            >
               <CardContent className="p-4 flex flex-col sm:flex-row gap-3 items-start sm:items-center">
-                <div className="text-muted-foreground/50 cursor-grab hidden sm:block">
+                <div className="text-muted-foreground/50 cursor-grab active:cursor-grabbing hidden sm:block">
                   <GripVertical className="h-5 w-5" />
                 </div>
 
@@ -178,6 +247,10 @@ export default function SectionsPage() {
                 </div>
               </CardContent>
             </Card>
+              {dragIndex !== null && dragOverIndex === index && dragIndex < index && (
+                <div className="h-0.5 bg-primary rounded-full mt-3" />
+              )}
+            </div>
           ))
         )}
       </div>

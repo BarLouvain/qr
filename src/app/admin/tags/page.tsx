@@ -125,9 +125,9 @@ export default function TagsPage() {
           </div>
 
           <div className="space-y-2">
-            <Label>Icoontje <span className="text-muted-foreground font-normal text-xs">(plak hier een emoji)</span></Label>
+            <Label>Icoontje <span className="text-muted-foreground font-normal text-xs">(druk ⊞ + . voor emoji)</span></Label>
             <Input
-              placeholder="🌿"
+              placeholder="😊"
               value={form.icon}
               onChange={e => setForm(f => ({ ...f, icon: e.target.value }))}
               className="w-24 text-xl text-center"

@@ -1,6 +1,6 @@
 "use client";
 
-import { useGetFullMenu } from "@/lib/api/hooks";
+import { useGetFullMenu, useListTags } from "@/lib/api/hooks";
 import { MenuTree } from "@/components/admin/MenuTree";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -8,13 +8,14 @@ import { AlertCircle } from "lucide-react";
 
 export default function AdminDashboardPage() {
   const { data: menu, isLoading, error } = useGetFullMenu();
+  const { data: tagDefs = [] } = useListTags();
 
   if (isLoading) {
     return (
       <div className="space-y-6">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Menu Dashboard</h1>
-          <p className="text-muted-foreground mt-1">Manage categories and items across all sections.</p>
+          <h1 className="text-3xl font-bold tracking-tight">Manage Products</h1>
+          
         </div>
         <div className="space-y-4">
           <Skeleton className="h-16 w-full" />
@@ -39,8 +40,8 @@ export default function AdminDashboardPage() {
     <div className="space-y-6 pb-20">
       <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight text-foreground">Menu Dashboard</h1>
-          <p className="text-muted-foreground mt-1">Organize your offerings. Create categories and add items.</p>
+          <h1 className="text-3xl font-bold tracking-tight text-foreground">Manage Products</h1>
+          
         </div>
       </div>
 
@@ -54,7 +55,7 @@ export default function AdminDashboardPage() {
       ) : (
         <div className="space-y-8">
           {menu?.map((section) => (
-            <MenuTree key={section.id} section={section} />
+            <MenuTree key={section.id} section={section} tagDefs={tagDefs} />
           ))}
         </div>
       )}

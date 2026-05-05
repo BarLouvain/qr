@@ -1,7 +1,7 @@
 import dotenv from "dotenv";
 dotenv.config({ path: ".env.local" });
-import { drizzle } from "drizzle-orm/node-postgres";
-import { Pool } from "pg";
+import { drizzle } from "drizzle-orm/postgres-js";
+import postgres from "postgres";
 import { and, eq, isNull } from "drizzle-orm";
 import {
   restaurantsTable,
@@ -19,8 +19,8 @@ const DEFAULT_TAGS = [
   { value: "glutenvrij", label: "Glutenvrij", icon: "🌾", bgColor: "#fdf6e3", textColor: "#8a6200", borderColor: "#f0d98a", sortOrder: 4 },
 ];
 
-const pool = new Pool({ connectionString: process.env.DATABASE_URL });
-const db = drizzle(pool);
+const client = postgres(process.env.DATABASE_URL!, { prepare: false });
+const db = drizzle({ client });
 
 const menuData = [
   {
@@ -520,7 +520,7 @@ async function seed() {
   }
 
   console.log("Done!");
-  await pool.end();
+  await client.end();
 }
 
 seed().catch((err) => {
