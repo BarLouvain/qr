@@ -9,6 +9,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
@@ -19,7 +20,23 @@ import { CategoryForm } from "./forms/CategoryForm";
 import { ItemForm } from "./forms/ItemForm";
 import type { SectionWithNested, CategoryWithItems, MenuItem, MenuTag } from "@/lib/api/types";
 
-export function MenuTree({ section, tagDefs = [] }: { section: SectionWithNested; tagDefs?: MenuTag[] }) {
+type SelectableItem = { id: number; name: string; categoryId: number };
+
+interface MenuTreeProps {
+  section: SectionWithNested;
+  tagDefs?: MenuTag[];
+  selectMode?: boolean;
+  selectedItemIds?: Set<number>;
+  onToggleItem?: (item: SelectableItem) => void;
+}
+
+export function MenuTree({
+  section,
+  tagDefs = [],
+  selectMode = false,
+  selectedItemIds = new Set(),
+  onToggleItem,
+}: MenuTreeProps) {
   const qc = useQueryClient();
   const [isOpen, setIsOpen] = useState(true);
   const [addingCategory, setAddingCategory] = useState(false);
@@ -157,7 +174,13 @@ export function MenuTree({ section, tagDefs = [] }: { section: SectionWithNested
                       </div>
                     </div>
                     <div className="p-3">
-                      <CategoryItemsList category={category} tagDefs={tagDefs} />
+                      <CategoryItemsList
+                        category={category}
+                        tagDefs={tagDefs}
+                        selectMode={selectMode}
+                        selectedItemIds={selectedItemIds}
+                        onToggleItem={onToggleItem}
+                      />
                     </div>
                   </div>
                   {catDragIndex !== null && catDragOverIndex === index && catDragIndex < index && (
@@ -187,11 +210,34 @@ export function MenuTree({ section, tagDefs = [] }: { section: SectionWithNested
   );
 }
 
-function CategoryItemsList({ category, tagDefs = [] }: { category: CategoryWithItems; tagDefs?: MenuTag[] }) {
+interface CategoryItemsListProps {
+  category: CategoryWithItems;
+  tagDefs?: MenuTag[];
+  selectMode?: boolean;
+  selectedItemIds?: Set<number>;
+  onToggleItem?: (item: SelectableItem) => void;
+}
+
+function CategoryItemsList({
+  category,
+  tagDefs = [],
+  selectMode = false,
+  selectedItemIds = new Set(),
+  onToggleItem,
+}: CategoryItemsListProps) {
+  const qc = useQueryClient();
   const [addingItem, setAddingItem] = useState(false);
   const [editingItem, setEditingItem] = useState<MenuItem | null>(null);
   const { toast } = useToast();
   const deleteItem = useDeleteItem();
+
+  const [orderedItems, setOrderedItems] = useState<MenuItem[]>(category.items);
+  const [itemDragIndex, setItemDragIndex] = useState<number | null>(null);
+  const [itemDragOverIndex, setItemDragOverIndex] = useState<number | null>(null);
+
+  useEffect(() => {
+    setOrderedItems(category.items);
+  }, [category.items]);
 
   const handleDelete = (id: number) => {
     deleteItem.mutate(
@@ -203,80 +249,147 @@ function CategoryItemsList({ category, tagDefs = [] }: { category: CategoryWithI
     );
   };
 
+  const handleItemDrop = async (targetIndex: number) => {
+    if (itemDragIndex === null || itemDragIndex === targetIndex) {
+      setItemDragIndex(null);
+      setItemDragOverIndex(null);
+      return;
+    }
+
+    const reordered = [...orderedItems];
+    const [moved] = reordered.splice(itemDragIndex, 1);
+    reordered.splice(targetIndex, 0, moved);
+
+    const updates = reordered
+      .map((item, i) => ({ item, newOrder: i }))
+      .filter(({ item, newOrder }) => item.sortOrder !== newOrder);
+
+    const withNewSortOrders = reordered.map((item, i) => ({ ...item, sortOrder: i }));
+    setOrderedItems(withNewSortOrders);
+    qc.setQueryData(fullMenuKey(), (old: SectionWithNested[] | undefined) => {
+      if (!old) return old;
+      return old.map((s) => ({
+        ...s,
+        categories: s.categories.map((c) =>
+          c.id === category.id ? { ...c, items: withNewSortOrders } : c
+        ),
+      }));
+    });
+    setItemDragIndex(null);
+    setItemDragOverIndex(null);
+
+    await Promise.all(
+      updates.map(({ item, newOrder }) =>
+        apiFetch(`/api/items/${item.id}`, { method: "PATCH", body: JSON.stringify({ sortOrder: newOrder }) })
+      )
+    );
+    qc.invalidateQueries({ queryKey: fullMenuKey() });
+  };
+
   return (
     <div className="space-y-3">
-      {category.items.length === 0 && !addingItem && (
+      {orderedItems.length === 0 && !addingItem && (
         <div className="text-sm text-muted-foreground italic py-2 pl-2">No items yet.</div>
       )}
 
       <div className="space-y-2">
-        {category.items.map((item) => (
-          <div key={item.id} className="flex items-center justify-between p-3 rounded bg-background border border-border gap-4">
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 flex-wrap">
-                {!item.active && (
-                  <Badge variant="outline" className="text-muted-foreground border-dashed shrink-0">Hidden</Badge>
+        {orderedItems.map((item, index) => (
+          <div key={item.id}>
+            {itemDragIndex !== null && itemDragOverIndex === index && itemDragIndex > index && (
+              <div className="h-0.5 bg-primary rounded-full mb-1" />
+            )}
+            <div
+              className={`flex items-center justify-between p-3 rounded bg-background border border-border gap-4 transition-opacity ${itemDragIndex === index ? "opacity-40" : ""}`}
+              draggable={!selectMode}
+              onDragStart={() => !selectMode && setItemDragIndex(index)}
+              onDragOver={(e) => { e.preventDefault(); setItemDragOverIndex(index); }}
+              onDrop={() => handleItemDrop(index)}
+              onDragEnd={() => { setItemDragIndex(null); setItemDragOverIndex(null); }}
+            >
+              {selectMode ? (
+                <div className="shrink-0">
+                  <Checkbox
+                    checked={selectedItemIds.has(item.id)}
+                    onCheckedChange={() =>
+                      onToggleItem?.({ id: item.id, name: item.name, categoryId: item.categoryId })
+                    }
+                  />
+                </div>
+              ) : (
+                <GripVertical className="h-4 w-4 text-muted-foreground/50 cursor-grab active:cursor-grabbing shrink-0" />
+              )}
+
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  {!item.active && (
+                    <Badge variant="outline" className="text-muted-foreground border-dashed shrink-0">Hidden</Badge>
+                  )}
+                  <span className={`font-medium ${!item.active ? "text-muted-foreground line-through" : ""}`}>{item.name}</span>
+                  <span className="font-mono text-sm bg-muted px-1.5 py-0.5 rounded text-muted-foreground shrink-0">€{item.price}</span>
+                  {item.featured && <Star className="h-3 w-3 text-secondary fill-secondary shrink-0" />}
+                  {item.featuredBadge && <Badge variant="secondary" className="text-xs bg-secondary/20 text-secondary border-none">{item.featuredBadge}</Badge>}
+                </div>
+                {item.description && <p className="text-sm text-muted-foreground mt-1 line-clamp-1">{item.description}</p>}
+                {item.tags.length > 0 && (
+                  <div className="flex gap-1 mt-1 flex-wrap">
+                    {item.tags.map((tagValue) => {
+                      const def = tagDefs.find(t => t.value === tagValue);
+                      return def ? (
+                        <span
+                          key={tagValue}
+                          className="text-[10px] font-semibold px-1.5 py-0.5 rounded"
+                          style={{ background: def.bgColor, color: def.textColor, border: `1px solid ${def.borderColor}` }}
+                        >
+                          {def.icon} {def.label}
+                        </span>
+                      ) : (
+                        <span key={tagValue} className="text-[10px] uppercase tracking-wider px-1.5 py-0.5 bg-accent text-accent-foreground rounded-sm">{tagValue}</span>
+                      );
+                    })}
+                  </div>
                 )}
-                <span className={`font-medium ${!item.active ? "text-muted-foreground line-through" : ""}`}>{item.name}</span>
-                <span className="font-mono text-sm bg-muted px-1.5 py-0.5 rounded text-muted-foreground shrink-0">€{item.price}</span>
-                {item.featured && <Star className="h-3 w-3 text-secondary fill-secondary shrink-0" />}
-                {item.featuredBadge && <Badge variant="secondary" className="text-xs bg-secondary/20 text-secondary border-none">{item.featuredBadge}</Badge>}
               </div>
-              {item.description && <p className="text-sm text-muted-foreground mt-1 line-clamp-1">{item.description}</p>}
-              {item.tags.length > 0 && (
-                <div className="flex gap-1 mt-1 flex-wrap">
-                  {item.tags.map((tagValue) => {
-                    const def = tagDefs.find(t => t.value === tagValue);
-                    return def ? (
-                      <span
-                        key={tagValue}
-                        className="text-[10px] font-semibold px-1.5 py-0.5 rounded"
-                        style={{ background: def.bgColor, color: def.textColor, border: `1px solid ${def.borderColor}` }}
-                      >
-                        {def.icon} {def.label}
-                      </span>
-                    ) : (
-                      <span key={tagValue} className="text-[10px] uppercase tracking-wider px-1.5 py-0.5 bg-accent text-accent-foreground rounded-sm">{tagValue}</span>
-                    );
-                  })}
+
+              {!selectMode && (
+                <div className="flex items-center gap-1 shrink-0">
+                  <Button size="icon" variant="outline" className="h-8 w-8" onClick={() => setEditingItem(item)}>
+                    <Edit2 className="h-4 w-4" />
+                  </Button>
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button size="icon" variant="ghost" className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10">
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Delete Item?</AlertDialogTitle>
+                        <AlertDialogDescription>Are you sure you want to delete &quot;{item.name}&quot;?</AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction onClick={() => handleDelete(item.id)} className="bg-destructive text-destructive-foreground">Delete</AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
                 </div>
               )}
             </div>
-
-            <div className="flex items-center gap-1 shrink-0">
-              <Button size="icon" variant="outline" className="h-8 w-8" onClick={() => setEditingItem(item)}>
-                <Edit2 className="h-4 w-4" />
-              </Button>
-              <AlertDialog>
-                <AlertDialogTrigger asChild>
-                  <Button size="icon" variant="ghost" className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10">
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </AlertDialogTrigger>
-                <AlertDialogContent>
-                  <AlertDialogHeader>
-                    <AlertDialogTitle>Delete Item?</AlertDialogTitle>
-                    <AlertDialogDescription>Are you sure you want to delete &quot;{item.name}&quot;?</AlertDialogDescription>
-                  </AlertDialogHeader>
-                  <AlertDialogFooter>
-                    <AlertDialogCancel>Cancel</AlertDialogCancel>
-                    <AlertDialogAction onClick={() => handleDelete(item.id)} className="bg-destructive text-destructive-foreground">Delete</AlertDialogAction>
-                  </AlertDialogFooter>
-                </AlertDialogContent>
-              </AlertDialog>
-            </div>
+            {itemDragIndex !== null && itemDragOverIndex === index && itemDragIndex < index && (
+              <div className="h-0.5 bg-primary rounded-full mt-1" />
+            )}
           </div>
         ))}
       </div>
 
-      {addingItem && (
+      {!selectMode && addingItem && (
         <div className="mt-4 p-4 border border-primary/30 bg-primary/5 rounded-lg">
           <h4 className="font-medium mb-3 text-primary">New Item</h4>
           <ItemForm categoryId={category.id} onSuccess={() => setAddingItem(false)} onCancel={() => setAddingItem(false)} />
         </div>
       )}
 
-      {!addingItem && (
+      {!selectMode && !addingItem && (
         <Button variant="outline" size="sm" className="mt-2 w-full border-dashed" onClick={() => setAddingItem(true)}>
           <Plus className="mr-2 h-4 w-4" /> Add Item
         </Button>
